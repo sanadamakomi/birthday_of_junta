@@ -1,0 +1,590 @@
+
+:root {
+  --dialog-h: 180px;
+  --dialog-w: 80vw;
+  --dialog-bg: rgba(0,0,0,0.6);
+  --text-color: #fff;
+  --font-size-name: 18px;
+  --font-size: 22px;
+  --offset: 18px; /* 向下移动距离 */
+}
+* { box-sizing: border-box; }
+/*
+ * Ensure the root of the application always stretches to the full
+ * viewport height on both desktop and mobile. Using a fixed viewport unit
+ * instead of percentage prevents situations where an ancestor lacks an
+ * explicit height, causing the stage to collapse and the background to
+ * render in a very small area. On mobile Safari, `dvh` and `svh` units
+ * reflect the dynamic and small viewport heights respectively.  Falling
+ * back to `100vh` ensures reasonable behaviour on browsers that do not
+ * yet support the newer units.
+ */
+html, body, #root {
+  height: 100dvh;
+  min-height: 100vh;
+}
+body { margin: 0; background:#000; color: var(--text-color); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Microsoft YaHei", Arial; }
+
+.center { display:flex; align-items:center; justify-content:center; height:100%; }
+.error { color: #f88; }
+
+/*
+ * The stage occupies the entire viewport and holds both the background and
+ * all interactive layers. Previously the stage only filled its parent's
+ * height which, when the parent didn't stretch to the viewport on mobile,
+ * resulted in a short container and a tiny background image. By pinning
+ * the stage to the viewport height with `100dvh` (and `100vh` as a
+ * fallback), we guarantee that the background always scales relative
+ * to the visible browser window. Overflow is hidden to clip sprites and
+ * other content that might extend beyond the bounds of the background.
+ */
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  background-position: center;
+  background-size: contain; /* 完整显示背景，可能产生黑边 */
+  background-repeat: no-repeat;
+  background-color: #000;
+  overflow: hidden;
+}
+
+/* 顶部条：语言 + 自动 + 菜单 */
+.topbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+.lang-switch, .autoplay-btn, .menu-btn {
+  background: rgba(0,0,0,.5);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: center;
+}
+.autoplay-btn:hover, .menu-btn:hover { background: rgba(255,255,255,.12); }
+
+.menu { position: relative; z-index: 1100; }
+.menu .menu-pop {
+  position: absolute;
+  z-index: 1100;
+  right: 0; top: 42px;
+  display: none;
+  background: rgba(0,0,0,.7);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  overflow: hidden;
+  
+}
+.menu:hover .menu-pop { display: flex; flex-direction: column; }
+.menu .menu-pop button {
+  background: transparent;
+  color:#fff;
+  border: none;
+  padding: 8px 10px;
+  text-align: center;
+  cursor: pointer;
+}
+.menu .menu-pop button:hover { background: rgba(255,255,255,.1); }
+
+/* 音频提示 */
+.audio-tip {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,.6);
+  border: 1px solid rgba(255,255,255,.2);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 9;
+}
+
+/* 立绘层 */
+.sprite-layer { position: absolute; inset: 0; pointer-events: none; }
+.sprite {
+  position: absolute;
+  bottom: var(--vpad, 0px);                         /* 贴背景可见底边 */
+  transform: translateX(-50%);
+  /*
+   * Limit the sprite's height relative to its containing stage rather than
+   * the global viewport. When the stage was shorter than the viewport
+   * (e.g. on mobile where the address bar reduces the available space),
+   * using `100vh` here allowed sprites to grow beyond the background.
+   * Constraining to 100% of the stage height ensures the sprite will
+   * always fit within the visible background area. We subtract
+   * `var(--vpad)` to account for the letterboxing computed in App.jsx.
+   */
+  max-height: calc(100% - var(--vpad, 0px));
+}
+
+/* 对话框 */
+.dialog {
+  position: absolute;
+  left: 50%;
+  bottom: var(--vpad, 0px); /* 与立绘底部对齐 */
+  transform: translateX(-50%);
+  width: var(--dialog-w, 80vw);
+  height: auto;
+  min-height: var(--dialog-h, 180px);
+  max-height: calc(50dvh - var(--vpad, 0px)); /* 限制高度，防止溢出 */
+  background: var(--dialog-bg);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 12px;
+  padding: 12px 60px 12px 16px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+}
+
+/* 移动端调整 */
+@media (max-width: 767px) {
+  .stage {
+    position: relative;
+    width: 100%;
+    height: 100dvh;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end; /* 子元素底部对齐 */
+    background-position: center bottom; /* 背景图片居中，底部对齐 */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-color: #000;
+    overflow: hidden;
+  }
+  .dialog {
+    top: calc(100dvh - var(--vpad, 0px) + var(--offset, 20px)); /* 顶部与立绘底部对齐 */
+    bottom: auto;
+    width: var(--dialog-w, 80vw);
+    max-height: calc(50dvh - var(--vpad, 0px)); /* 限制高度 */
+  }
+  .sprite {
+    bottom: calc(var(--vpad, 0px) - var(--offset, 20px)); /* 向下移动 */
+    height: calc(100dvh - var(--vpad, 0px));
+    min-height: calc(100vh - var(--vpad, 0px));
+    object-fit: cover;
+    object-position: center bottom;
+  }
+}
+
+.dialog-inner { display: flex; flex-direction: column; gap: 6px; width: 100%;  padding: 10px 12px 10px 28px; }
+.name { font-weight: 700; opacity: .9; font-size: var(--font-size-name);}
+.text { font-size: var(--font-size); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+.dialog .name { text-align: left; }
+
+/* 下一句按钮 */
+.next-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 45px; height: 45px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.2);
+  cursor: pointer;
+  font-size: 20px;
+}
+.next-btn:hover { background: rgba(255,255,255,.2); }
+
+/* 选择 */
+
+/* ===== Choice Overlay (centered modal) ===== */
+.choice-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.4);   /* backdrop */
+  z-index: 1000;                 /* above dialog */
+}
+/* 让遮罩不拦截点击 */
+.choice-overlay {
+  pointer-events: none;
+}
+
+/* 只有中间的弹框接收点击 */
+.choice-overlay .choice-box {
+  pointer-events: auto;
+}
+.choice-box {
+  background: rgba(30,30,30,.92);
+  backdrop-filter: blur(2px);
+  padding: 20px;
+  border-radius: 14px;
+  max-width: min(720px, 86vw);
+  width: 100%;
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.14);
+}
+
+/* Title */
+.choice-box .name {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  margin-bottom: 16px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid rgba(255,255,255,.22);
+  letter-spacing: 2px;
+}
+
+/* Choice list */
+.choice-box .choices {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* Single choice button */
+.choice-box .choice {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: left;
+  padding: 14px 18px;
+  line-height: 1.6;
+  border-radius: 12px;
+  border: 2px solid rgba(255,255,255,.38);
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  cursor: pointer;
+  transition: all .22s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  white-space: normal;
+  word-break: break-word;
+  outline: none;
+}
+
+.choice-box .choice:hover,
+.choice-box .choice:focus-visible {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+}
+
+.choice-box .choice:active {
+  transform: scale(.98);
+}
+
+.choice-box .choice--disabled {
+  opacity: .5;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+
+/* 居中的选择框 */
+.dialog-center {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(720px, 86vw);
+  height: auto;
+  padding-bottom: 16px;
+}
+.dialog-center .choices { margin-top: 6px; }
+
+/* Start overlay */
+.start-overlay {
+  position: fixed; inset: 0;
+  background: #000 center/cover no-repeat;
+  display: grid; place-items: center;
+  z-index: 50;
+}
+/* 开场卡片：可叠加一张底图 */
+.start-card{
+  width: min(90vw, 480px);
+  padding: 24px 28px;
+  border-radius: 16px;
+  background:
+    var(--start-card-bg, rgba(0,0,0,.55));
+  color: #fff;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  /* 若有内联 backgroundImage，则覆盖上面的背景色 */
+  background-size: cover; background-position: center;
+  text-align: center;
+}
+.start-actions { display:flex; flex-direction: column; gap: 12px; align-items: stretch; margin-top: 12px; }
+.start-card button {
+  border-radius: 10px; border: 1px solid rgba(255,255,255,.2); padding: 10px 16px; cursor: pointer;
+  background: rgba(255,255,255,.08); color:#fff;
+}
+.start-card button:hover { background: rgba(255,255,255,.14); }
+.start-card .primary { background: rgba(255,255,255,.18); }
+.start-card .secondary:disabled { opacity: .5; cursor: not-allowed; }
+
+.start-lang-chips{
+  display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+  margin: 6px 0 14px;
+}
+.start-lang-chip{
+  color:#fff; background: rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:999px; padding:8px 12px; min-height:36px;
+  font-weight:600; letter-spacing:.02em;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.20), inset 0 0 0 1px rgba(255,255,255,.06);
+  cursor:pointer; transition: background-color .2s, box-shadow .2s, transform .06s;
+}
+.start-lang-chip:hover{ background: rgba(0,0,0,.60); }
+.start-lang-chip:active{ transform: translateY(1px); }
+.start-lang-chip.is-active{
+  background: rgba(0,0,0,.65);
+  border-color: rgba(255,255,255,.28);
+}
+
+/* 结束页：整屏一张图 */
+.end-overlay{
+  position: fixed; inset: 0;
+  background: #000 center/cover no-repeat;
+  display: grid; place-items: center;
+  z-index: 60; /* 高于开场遮罩 */
+}
+.end-actions{
+  margin-top: 83vh; /* 按图构图调整按钮位置 */
+}
+.end-overlay .primary{
+  padding: 10px 18px;
+  font-size: clamp(14px, 2.2vh, 18px);
+}
+
+/* Modal */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 12;
+}
+.modal {
+  background: rgba(0,0,0,.8);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 12px;
+  width: min(800px, 92vw);
+  max-width: 92vw;
+}
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.15); }
+.modal-title { font-weight: 700; }
+.modal-close { background: transparent; color:#fff; border:none; cursor:pointer; font-size: 22px; padding:4px 8px; }
+.modal-body { padding: 12px; }
+.modal-row { display:flex; gap: 10px; margin-bottom: 8px; }
+.modal-row button { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.1); color:#fff; cursor:pointer; }
+.modal-row button:hover { background: rgba(255,255,255,.18); }
+.modal-desc { opacity: .8; font-size: 14px; }
+
+/* HUD */
+.hud { position: absolute; left: 16px; bottom: 8px; font-size: 12px; opacity: .7; }
+
+
+/* 只作用于结束页里的按钮 */
+.end-overlay button {
+  color: #fff;
+  background: rgba(0,0,0,.45);         /* 黑色半透明底 */
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 999px;                /* 圆润边缘 */
+  padding: 12px 18px;
+  min-height: 44px;                    /* 移动端更好点 */
+  font-weight: 600;
+  letter-spacing: .02em;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.06);
+  transition: background-color .2s ease, box-shadow .2s ease, transform .06s ease;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+/* 主按钮略更实一些（如果你有 .primary 类） */
+.end-overlay .primary { background: rgba(0,0,0,.60); }
+
+/* 交互态 */
+.end-overlay button:hover {
+  background: rgba(0,0,0,.65);
+  box-shadow: 0 8px 20px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.10);
+}
+.end-overlay button:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.22), inset 0 0 0 1px rgba(255,255,255,.10);
+}
+.end-overlay button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,.22),
+    0 8px 20px rgba(0,0,0,.32),
+    inset 0 0 0 1px rgba(255,255,255,.10);
+}
+.end-overlay button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  filter: grayscale(.2);
+  box-shadow: none;
+}
+
+/* 攻略提示 */
+
+.guide-modal{
+  max-height: 70vh;
+  overflow: auto;
+  padding: 4px 2px;
+}
+.guide-title{ margin: 0 0 6px; font-size: 18px; }
+.guide-note{ margin: 0 0 12px; opacity: .85; }
+
+.guide-table-wrap{ overflow:auto; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); }
+.guide-table{
+  width: 100%; border-collapse: collapse; background: rgba(255,255,255,.04);
+}
+.guide-table th, .guide-table td{
+  padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.08);
+  text-align: left; vertical-align: top;
+}
+.guide-table thead th{
+  background: rgba(255,255,255,.06); position: sticky; top: 0; backdrop-filter: blur(2px);
+}
+
+.guide-sections .guide-section{ margin: 12px 0; }
+.guide-sections h4{ margin: 0 0 6px; font-size: 16px; }
+.guide-empty{ opacity: .7; }
+
+
+/* 右上角菜单弹层更宽更稳 */
+.menu .menu-pop{
+  min-width: 100px;                 /* 原来没宽度 → 先给个最小宽 */
+  width: clamp(100px, 28vw, 200px); /* 自适应屏幕，最大 320px */
+}
+
+/* 菜单项再舒展一点 */
+.menu .menu-pop button{
+  padding: 10px 14px;               /* 原 8px 10px → 更舒展 */
+  font-size: 14px;
+}
+
+.lang-switch{ min-width: 100px; }
+
+
+/* 开始页的小提示行 */
+.start-rotate-hint{
+  display:flex; gap:10px; align-items:center; justify-content:center;
+  margin: 6px 0 14px;
+  color:#fff; opacity:.9;
+}
+.start-rotate-hint .ghost{
+  color:#fff; background: rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.22); border-radius:999px;
+  padding:6px 12px; min-height:32px; font-weight:600;
+  backdrop-filter: blur(2px);
+}
+
+/* 竖屏提示覆盖层（进行中才出现） */
+.rotate-overlay{
+  position: fixed; inset: 0; z-index: 70;   /* 高于对话层 */
+  background: rgba(0,0,0,.75);
+  display: none; place-items: center;
+}
+@media (orientation: portrait){
+  .rotate-overlay{ display: grid; }
+}
+.rotate-box{
+  width: min(90vw, 420px);
+  text-align: center; color:#fff;
+  background: rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.22);
+  border-radius: 16px; padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
+}
+.rotate-box .icon{ font-size: 32px; margin-bottom: 6px; }
+.rotate-box .msg{ margin-bottom: 10px; opacity:.95; }
+.rotate-box .primary{
+  color:#fff; background: rgba(0,0,0,.60);
+  border:1px solid rgba(255,255,255,.22); border-radius:999px;
+  padding:10px 16px; min-height:40px; font-weight:600;
+}
+
+/* 移动端竖屏：用 vw 控字号，显著减小而不影响 PC/横屏 */
+@media (max-width: 767px) and (orientation: portrait){
+  :root{
+    /* 比上一版再增 ~15–20% */
+    --fs-dialog: clamp(13px, 3.8vw, 17px); /* 正文 */
+    --fs-name:   clamp(12px, 3.4vw, 16px); /* 说话人 */
+    --fs-ui:     clamp(12px, 3.2vw, 15px); /* HUD/菜单/按钮 */
+  }
+
+  /* 竖屏时对话框略收窄，阅读更舒服（可选） */
+  .dialog{ 
+    /* 让对话框至少占 30%–44% 视口高度，按机型自适应 */
+    min-height: clamp(140px, 30vh, 44vh);
+
+    /* 稍微加厚内边距，并照顾 iOS 安全区 */
+    padding: 12px 12px max(12px, env(safe-area-inset-bottom) + 12px);
+    width: min(96vw, 720px);   /* 略放宽，英文折行更少 */
+  }
+  /* 为了不压住正文，让内层可占满对话框高度 */
+  .dialog-inner{
+    max-height: calc(100% - 6px); /* 预留一点给 name-tag 的空间 */
+  }  
+}
+
+/* 超小屏再降一级（可选） */
+@media (max-width: 360px) and (orientation: portrait){
+  :root{
+    --fs-dialog: clamp(13px, 4.8vw, 19px);
+    --fs-name:   clamp(12px, 4.2vw, 17px);
+    --fs-ui:     clamp(11px, 3.8vw, 15px);
+  }
+}
+
+
+/* 移动端横屏：对话框≈150px起步 + 更小字号 */
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) and (max-width: 1000px){
+  /* 字体再小一档（仅横屏移动端） */
+  :root{
+    --fs-dialog: clamp(11px, 1.9vh, 14px); /* 正文 */
+    --fs-name:   clamp(10px, 1.7vh, 13px); /* 标题/姓名 */
+    --fs-ui:     clamp(10px, 1.6vh, 12px); /* HUD/菜单/按钮 */
+    --lh-dialog: 1.34;                     /* 行高再收一点，减少换行 */
+  }
+
+  /* 对话框：至少 150px，高度随屏高增长一些 */
+  .dialog{
+    width: min(84vw, 820px);
+    min-height: clamp(150px, 18vh, 24vh);   /* ← 150px 起步 */
+    max-height: clamp(160px, 26vh, 28vh);   /* 预防极宽屏过高 */
+    padding: 10px 56px 10px 14px;           /* 右侧给“下一句”按钮留空间 */
+  }
+  .dialog .text{ line-height: var(--lh-dialog); }
+  .dialog-inner{ max-height: calc(100% - 4px); }
+
+  /* 若使用姓名小方框，横屏时位置微调（有就生效） */
+  .name-tag{ left: 18px; top: -10px; }
+
+  /* 选项弹窗：沿用上版收窄；如需更窄改这里两个数 */
+  .choice-box{
+    width: min(76vw, 560px);
+    padding: 14px 16px;
+  }
+  .choice-box .name{
+    font-size: var(--fs-name);
+    margin-bottom: 8px;
+  }
+  .choice-box .choice{
+    font-size: var(--fs-dialog);
+    padding: 10px 14px;
+    line-height: var(--lh-dialog);
+  }
+}
