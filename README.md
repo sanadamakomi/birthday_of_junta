@@ -1,6 +1,8 @@
 # birthday_of_junta
 A web AVG game to celebrate Teshima Junta's Birthday, built with **Vite + React**.
-This project was made with love as a birthday gift, created in 2025。09.11. 
+
+This project was made with love as a birthday gift, created in 2025.09.11. 
+
 Even if it’s offline now, the memory stays forever. 💫
 
 ---
